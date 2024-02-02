@@ -1,0 +1,31 @@
+
+i
+java:S11925"LDefine a constant instead of duplicating this literal "I/O error: " 3 times.(²‹Á„8ƒÂª¿Ö1
+‚
+java:S1488Y"`Immediately return this expression instead of assigning it to the temporary variable "received".(ì¦ŞÚùÿÿÿÿ8ƒÂª¿Ö1
+k
+java:S2259x"N"NullPointerException" will be thrown when invoking method "inputDataValid()".(ıÅòÛ8˜Âª¿Ö1
+t
+java:S1450"WRemove the "sendData" field and declare it as a local variable in the relevant methods.(øÒ×ï8šÂª¿Ö1
+L	java:S106"+Replace this use of System.err by a logger.(ÁªÆ£ıÿÿÿÿ8œÂª¿Ö1
+G	java:S106/"+Replace this use of System.out by a logger.(Á…ğÆ8Âª¿Ö1
+O
+java:S1135/"2Complete the task associated to this TODO comment.(Á…ğÆ8Âª¿Ö1
+L	java:S1063"+Replace this use of System.err by a logger.(×Í©±úÿÿÿÿ8Âª¿Ö1
+G	java:S1065"+Replace this use of System.err by a logger.(²‹Á„8Âª¿Ö1
+G	java:S106:"+Replace this use of System.out by a logger.(Í¯µ˜8Âª¿Ö1
+T
+java:S1135E"2Complete the task associated to this TODO comment.(”üƒÚùÿÿÿÿ8ŸÂª¿Ö1
+L	java:S106I"+Replace this use of System.err by a logger.(×Í©±úÿÿÿÿ8ŸÂª¿Ö1
+G	java:S106K"+Replace this use of System.err by a logger.(²‹Á„8ŸÂª¿Ö1
+d
+java:S1659e"GDeclare "portString" and all following declarations on a separate line.(†Öüú8£Âª¿Ö1
+G	java:S106i"+Replace this use of System.out by a logger.(’Œß§8¤Âª¿Ö1
+G	java:S106k"+Replace this use of System.out by a logger.(×­¢8¤Âª¿Ö1
+G	java:S106m"+Replace this use of System.out by a logger.(„Ä³8¤Âª¿Ö1
+G	java:S106o"+Replace this use of System.out by a logger.(Â˜­•8¤Âª¿Ö1
+G	java:S106s"+Replace this use of System.err by a logger.(²‹Á„8¥Âª¿Ö1
+L	java:S106y"+Replace this use of System.err by a logger.(ó’·¨üÿÿÿÿ8¥Âª¿Ö1
+G	java:S106~"+Replace this use of System.err by a logger.(Âô¥û8¥Âª¿Ö1
+M	java:S106"+Replace this use of System.out by a logger.(³®¨öşÿÿÿÿ8¦Âª¿Ö1
+M	java:S106‘"+Replace this use of System.out by a logger.(³®¨öşÿÿÿÿ8§Âª¿Ö1
