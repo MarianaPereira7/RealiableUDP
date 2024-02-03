@@ -2,8 +2,8 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-!**/src/main/*.class
-/src/*.class
+**/src/main/*.class
+*.class
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
