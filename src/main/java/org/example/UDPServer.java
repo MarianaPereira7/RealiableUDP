@@ -7,12 +7,13 @@ import java.util.HashMap;
 
 public class UDPServer {
     private DatagramSocket udpSocket;
-    private byte[] receiveData = new byte[256];
-    private byte[] sendData = new byte[256];
+    private byte[] receiveData = new byte[bufferLength];
+    private byte[] sendData = new byte[bufferLength];
+    private static int bufferLength = 20;
     private HashMap<String,String> clientMap = new HashMap<>();
 
     /**
-     * Starts the EchoServer, bindind it to the specified port
+     * Starts the EchoServer, binding it to the specified port
      *
      * @param port UDP port binded by the server
      */
@@ -28,60 +29,36 @@ public class UDPServer {
         }
 
     }
-    public int sendData(String message, InetAddress address, int port) {
-        int counter = 0;
-        try{
-            String received = "NONE";
 
-            while (!received.equals("ACK") && counter < 3) {
-                counter++;
-                sendPacket(address,port,message);
-                received = receivePacket();
-                System.out.println(received); // TODO DELETE
-            }
-
-        }catch(SocketTimeoutException e){
-            System.err.println("Timeout reached: " + e.getMessage());
-        }catch (IOException e){
-            System.err.println("I/O error: " + e.getMessage());
-        }
-
-        //Validação mensagem recebida com sucesso.
-        if(counter == 3){
-            System.out.println("Failed to send string. Terminating!");
-            return -1;
-        }
-        return 0;
-    }
     /**
      * Waits for client data and sends back lines as they are typed
      */
     public void waitPackets(){
-        DatagramPacket packet;
-        InetAddress remoteAddr;
-        int remotePort;
-        String received;
-
         while (true) {
             try{
-                packet = new DatagramPacket(receiveData, receiveData.length);
-                udpSocket.receive(packet);
-                remoteAddr = packet.getAddress();
-                remotePort = packet.getPort();
-                received = new String(packet.getData(), 0, packet.getLength());
+                String[] received = receiveMessage();
+                if(received == null) {
+                    System.out.println("Did not receive valid string from client. Terminating!");
+                    break;
+                }
 
-                System.out.println("Received " + received.length() + " bytes from (" + remoteAddr.getHostAddress() + "," + remotePort +")"); // TODO DELETE
+                String hostname        = received[0];
+                int remotePort         = Integer.parseInt(received[1]);
+                String message         = received[2];
+                InetAddress remoteAddr = InetAddress.getByName(hostname);
 
-                sendPacket(remoteAddr,remotePort,"ACK");
-                String client = remoteAddr.toString() + " - " + Integer.toString(remotePort);
+                String client = remoteAddr.toString() + " - " + remotePort;
 
+                //First registers the client in the map
                 if(clientMap.get(client) == null){
-                    clientMap.put(client,received);
+                    clientMap.put(client,message);
                 }else{
-                    String[] data = stringAnonymizer(clientMap.get(client),received);
+                    //When we already have a client, it means the phrase is already registered.
+                    //In this case, keyword is received and sent along with the phrase to be anonymized.
+                    String[] data = stringAnonymizer(clientMap.get(client),message);
                     boolean successfulDeliver = true;
                     for(String singleString : data){
-                        if(sendData(singleString,remoteAddr,remotePort) == -1) {
+                        if(sendMessage(singleString,remoteAddr,remotePort) == -1) {
                             System.out.println("Result transmission failed.Terminating!");
                             successfulDeliver = false;
                             break;
@@ -89,7 +66,7 @@ public class UDPServer {
                     }
                     if(successfulDeliver){
                         for(int i = 0; i < Integer.parseInt(data[1]); i++) {
-                            if (sendData("Socket Programming", remoteAddr, remotePort) == -1) {
+                            if (sendMessage("Socket Programming", remoteAddr, remotePort) == -1) {
                                 System.out.println("Result transmission failed.Terminating!");
                                 break;
                             }
@@ -104,16 +81,118 @@ public class UDPServer {
         }
     }
 
+    private String[] receiveMessage(){
+        String[] received = receiveReliablePacket();
+        String message = received[2];
+
+        if (!message.contains("Length:")){
+            return null;
+        }
+        // Split the string by colon
+        String[] parts = message.split(":");
+        if (parts.length < 2){
+            return null;
+        }
+        int numberFragments = Integer.parseInt(parts[1].trim());
+
+        String finalMessage = "";
+
+        for(int i = 0; i < numberFragments; i++) {
+            String splitMessage = receiveReliablePacket()[2];
+            finalMessage = String.join("", finalMessage, splitMessage);
+        }
+        received[2] = finalMessage;
+        return received;
+
+    }
+
+    private String[] receiveReliablePacket() {
+        String[] received = new String[3];
+        try{
+            received = receivePacket();
+            String hostname = received[0];
+            int port = Integer.parseInt(received[1]);
+            InetAddress address = InetAddress.getByName(hostname);
+            sendPacket(address,port,"ACK");
+
+        }catch(SocketTimeoutException e){
+            System.err.println("Timeout reached: " + e.getMessage());
+        }catch (IOException e){
+            System.err.println("I/O error: " + e.getMessage());
+        }
+        return received;
+    }
+
+    private int sendMessage(String message, InetAddress address, int port){
+        //Calculate number of fragments, in case buffer length is lower than the message length
+        int messageLength = message.length();
+        int numberOfFragments = (int) Math.ceil((double) messageLength / bufferLength);
+        String[] fragmentedMessage = divideMessage(message,numberOfFragments);
+
+        if(sendReliablePacket("Length:" + numberOfFragments,address,port) == -1){
+            return -1;
+        }
+
+        for(int i = 0; i < numberOfFragments; i++){
+            if(sendReliablePacket(fragmentedMessage[i],address,port) == -1){
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    private String[] divideMessage(String message, int numberOfFragments){
+        String[] fragments = new String[numberOfFragments];
+        if(numberOfFragments == 1){
+            fragments[0] = message;
+            return fragments;
+        }
+        for(int i = 0; i < numberOfFragments; i++){
+            int start = i * bufferLength;
+            int end = Math.min((i + 1) * bufferLength, message.length());
+            fragments[i] = message.substring(start,end);
+        }
+        return fragments;
+    }
+
+    private int sendReliablePacket(String message, InetAddress address, int port) {
+        int counter = 0;
+        try{
+            String received = "NONE";
+
+            while (!received.equals("ACK") && counter < 3) {
+                counter++;
+                sendPacket(address,port,message);
+                received = receivePacket()[2];
+            }
+
+        }catch(SocketTimeoutException e){
+            System.err.println("Timeout reached: " + e.getMessage());
+        }catch (IOException e){
+            System.err.println("I/O error: " + e.getMessage());
+        }
+
+        //To validate if the message was successfully sent:
+        if(counter == 3){
+            System.out.println("Failed to send string. Terminating!");
+            return -1;
+        }
+        return 0;
+    }
+
     private void sendPacket(InetAddress address, int port, String message) throws IOException {
         sendData = message.getBytes();
         DatagramPacket packet = new DatagramPacket(sendData, sendData.length, address, port);
         udpSocket.send(packet);
     }
 
-    private String receivePacket() throws IOException {
+    private String[] receivePacket() throws IOException {
         DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
         udpSocket.receive(packet);
-        String received = new String(packet.getData(), 0, packet.getLength());
+        String[] received = new String[3];
+        received[0] = packet.getAddress().getHostAddress().toString();
+        received[1] = Integer.toString(packet.getPort());
+        received[2] = new String(packet.getData(), 0, packet.getLength());
         return received;
     }
 
@@ -135,23 +214,23 @@ public class UDPServer {
     }
 
     public String[] stringAnonymizer(String phrase, String wordToBeAnonimized){
-        String[] annonymized = new String[2];
+        String[] anonymized = new String[2];
         int counter = 0;
         String[] phraseArray = phrase.split(" ");
         for(int i = 0; i < phraseArray.length; i++){
             if(lastCharEvaluator(phraseArray[i]).equalsIgnoreCase(wordToBeAnonimized)){
-                phraseArray[i] = wordAnonimizer(phraseArray[i]);
+                phraseArray[i] = wordAnonimyzer(phraseArray[i]);
                 counter++;
             }
         }
-        annonymized[0] = String.join(" ",phraseArray);
-        annonymized[1] = Integer.toString(counter);
+        anonymized[0] = String.join(" ",phraseArray);
+        anonymized[1] = Integer.toString(counter);
 
-        return annonymized;
+        return anonymized;
 
     }
 
-    public String wordAnonimizer(String word){
+    public String wordAnonimyzer(String word){
         char[] wordArray = new char[word.length()];
         for(int i = 0; i < word.length(); i++){
             wordArray[i] = word.charAt(i);

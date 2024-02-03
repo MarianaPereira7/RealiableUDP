@@ -9,8 +9,9 @@ import static java.lang.Integer.parseInt;
 
 public class UDPClient {
     private DatagramSocket udpSocket;
-    private byte[] receiveData = new byte[256];
-    private byte[] sendData = new byte[256];
+    private byte[] receiveData = new byte[bufferLength];
+    private byte[] sendData = new byte[bufferLength];
+    private static int bufferLength = 20;
 
     /**
      * Creates a DatagramSocket and sets its reception timeout
@@ -27,24 +28,56 @@ public class UDPClient {
         }
     }
 
+
+    public int sendMessage(String message, InetAddress address, int port){
+        //Calculate number of fragments, in case buffer length is lower than the message length
+        int messageLength = message.length();
+        int numberOfFragments = (int) Math.ceil((double) messageLength / bufferLength);
+        String[] fragmentedMessage = divideMessage(message,numberOfFragments);
+
+        if(sendReliablePacket("Length:" + numberOfFragments,address,port) == -1){
+            return -1;
+        }
+
+        for(int i = 0; i < numberOfFragments; i++){
+            if(sendReliablePacket(fragmentedMessage[i],address,port) == -1){
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    private String[] divideMessage(String message, int numberOfFragments){
+        String[] fragments = new String[numberOfFragments];
+        if(numberOfFragments == 1){
+            fragments[0] = message;
+            return fragments;
+        }
+        for(int i = 0; i < numberOfFragments; i++){
+            int start = i * bufferLength;
+            int end = Math.min((i + 1) * bufferLength, message.length());
+            fragments[i] = message.substring(start,end);
+        }
+        return fragments;
+    }
+
+
     /**
      * Repeatedly reads a line from terminal, sends it to a server living at hostname:port, and waits for a reply
      * Use CTRL + D to exit
      *
-     *  @param hostname Name of the UDP server
+     *  @param address IP address of the UDP server
      *  @param port Port binded to the UDP server living at hostname
      */
-    public int sendData(String message, String hostname, int port) {
+    private int sendReliablePacket(String message, InetAddress address, int port) {
         int counter = 0;
         try{
-            InetAddress address = InetAddress.getByName(hostname);
             String received = "NONE";
 
             while (!received.equals("ACK") && counter < 3) {
                 counter++;
                 sendPacket(address,port,message);
                 received = receivePacket();
-                System.out.println(received); // TODO DELETE
             }
 
         }catch(SocketTimeoutException e){
@@ -53,7 +86,7 @@ public class UDPClient {
             System.err.println("I/O error: " + e.getMessage());
         }
 
-        //Validação mensagem recebida com sucesso.
+        //To validate if the message was successfully sent:
         if(counter == 3){
             System.out.println("Failed to send string. Terminating!");
             return -1;
@@ -61,12 +94,36 @@ public class UDPClient {
         return 0;
     }
 
-    public String receiveData(String hostname, int port) {
+    public String receiveMessage(String hostname, int port){
+        String message = receiveReliablePacket(hostname, port);
+
+        if (!message.contains("Length:")){
+
+            return null;
+        }
+        // Split the string by colon
+        String[] parts = message.split(":");
+        if (parts.length < 2) {
+            return null;
+        }
+        int numberFragments = Integer.parseInt(parts[1].trim());
+
+        String finalMessage = "";
+
+        for(int i = 0; i < numberFragments; i++) {
+            String splitMessage = receiveReliablePacket(hostname, port);
+            finalMessage = String.join("", finalMessage, splitMessage);
+        }
+
+        return finalMessage;
+
+    }
+
+    private String receiveReliablePacket(String hostname, int port) {
         String received = null;
         try{
             InetAddress address = InetAddress.getByName(hostname);
             received = receivePacket();
-            // System.out.println(received); // TODO DELETE
             sendPacket(address,port,"ACK");
 
         }catch(SocketTimeoutException e){
@@ -97,7 +154,7 @@ public class UDPClient {
         udpSocket.close();
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws UnknownHostException {
         String hostname = null; String portString = null; String phrase = null; String keyword = null;
 
         try(BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in))){
@@ -116,12 +173,12 @@ public class UDPClient {
         }
 
         //Input validation
-        int port = parseInt(portString);
         if(!inputDataValid(hostname,portString,phrase,keyword)) {
             System.err.println("Invalid input format. Terminating!");
             System.exit(1);
         }
         //Port validation
+        int port = parseInt(portString);
         if(port < 1024 || port > 49151){
             System.err.println("Invalid port number. Terminating!");
             System.exit(1);
@@ -129,20 +186,36 @@ public class UDPClient {
 
         UDPClient client = new UDPClient(1000);
 
-        if(client.sendData(phrase,hostname,port) == -1){
+        InetAddress address = InetAddress.getByName(hostname);
+
+        if(client.sendMessage(phrase,address,port) == -1){
             client.close();
             System.exit(1);
         }
 
-        if(client.sendData(keyword,hostname,port) == -1){
+        if(client.sendMessage(keyword,address,port) == -1) {
             client.close();
             System.exit(1);
         }
-
-        System.out.println(client.receiveData(hostname,port));
-        int repeate = Integer.parseInt(client.receiveData(hostname,port));
-        for(int i = 0; i < repeate; i++){
-            System.out.println(client.receiveData(hostname,port));
+        String received = client.receiveMessage(hostname,port);
+        if(received == null){
+            client.close();
+            System.exit(1);
+        }
+        System.out.println(received);
+        received = client.receiveMessage(hostname,port);
+        if(received == null){
+            client.close();
+            System.exit(1);
+        }
+        int repeat = Integer.parseInt(received);
+        for(int i = 0; i < repeat; i++){
+            received = client.receiveMessage(hostname,port);
+            if(received == null){
+                client.close();
+                System.exit(1);
+            }
+            System.out.println(received);
         }
         client.close();
     }
