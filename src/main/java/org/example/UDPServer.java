@@ -26,7 +26,6 @@ public class UDPServer {
             System.err.println("Server exception: " + e.getMessage());
             e.printStackTrace();
         }
-
     }
 
     /**
@@ -145,7 +144,7 @@ public class UDPServer {
         int numberOfFragments = (int) Math.ceil((double) messageLength / bufferLength);
         String[] fragmentedMessage = divideMessage(message,numberOfFragments);
 
-        if(sendReliablePacket("Packets:" + numberOfFragments,address,port) == -1){
+        if(sendReliablePacket("Packets: " + numberOfFragments,address,port) == -1){
             return -1;
         }
 

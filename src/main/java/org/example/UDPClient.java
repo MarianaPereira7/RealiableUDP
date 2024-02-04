@@ -151,7 +151,7 @@ public class UDPClient {
     /**
      * Closes the DatagramSocket
      */
-    private void close() {
+    public void close() {
         udpSocket.close();
     }
 
