@@ -14,8 +14,7 @@ public class UDPServer {
 
     /**
      * Starts the EchoServer, binding it to the specified port
-     *
-     * @param port UDP port binded by the server
+     * @param port UDP port to run the server
      */
     UDPServer(int port){
         udpSocket = null;
@@ -31,7 +30,13 @@ public class UDPServer {
     }
 
     /**
-     * Waits for client data and sends back lines as they are typed
+     * Waits for client data (client name, port number and message).
+     * On a first client attempt: Saves the message in a map, to map all client's information.
+     * On a second client attempt: Receives a keyword and anonymizes the message stored for the corresponding client.
+     * 1) Successful case: Handles the message to be anonymized and sends it back, followed by the message "Socket Programming"
+     * as many times as the chosen keyword is present in the original message.
+     * 2) Unsuccessful case: At any point, if server does not receive an acknowledgment after trying to send the same
+     * message for 3 consecutive times, it will print "Result transmission failed.Terminating!".
      */
     public void waitPackets(){
         while (true) {
@@ -65,7 +70,8 @@ public class UDPServer {
                         }
                     }
                     if(successfulDeliver){
-                        for(int i = 0; i < Integer.parseInt(data[1]); i++) {
+                        int repetitions = Integer.parseInt(data[1]);
+                        for(int i = 0; i < repetitions; i++) {
                             if (sendMessage("Socket Programming", remoteAddr, remotePort) == -1) {
                                 System.out.println("Result transmission failed.Terminating!");
                                 break;
@@ -85,7 +91,7 @@ public class UDPServer {
         String[] received = receiveReliablePacket();
         String message = received[2];
 
-        if (!message.contains("Length:")){
+        if (!message.contains("Packets: ")){
             return null;
         }
         // Split the string by colon
@@ -123,13 +129,23 @@ public class UDPServer {
         return received;
     }
 
+    private String[] receivePacket() throws IOException {
+        DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
+        udpSocket.receive(packet);
+        String[] received = new String[3];
+        received[0] = packet.getAddress().getHostAddress().toString();
+        received[1] = Integer.toString(packet.getPort());
+        received[2] = new String(packet.getData(), 0, packet.getLength());
+        return received;
+    }
+
     private int sendMessage(String message, InetAddress address, int port){
         //Calculate number of fragments, in case buffer length is lower than the message length
         int messageLength = message.length();
         int numberOfFragments = (int) Math.ceil((double) messageLength / bufferLength);
         String[] fragmentedMessage = divideMessage(message,numberOfFragments);
 
-        if(sendReliablePacket("Length:" + numberOfFragments,address,port) == -1){
+        if(sendReliablePacket("Packets:" + numberOfFragments,address,port) == -1){
             return -1;
         }
 
@@ -186,17 +202,7 @@ public class UDPServer {
         udpSocket.send(packet);
     }
 
-    private String[] receivePacket() throws IOException {
-        DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
-        udpSocket.receive(packet);
-        String[] received = new String[3];
-        received[0] = packet.getAddress().getHostAddress().toString();
-        received[1] = Integer.toString(packet.getPort());
-        received[2] = new String(packet.getData(), 0, packet.getLength());
-        return received;
-    }
-
-    public String lastCharEvaluator(String word){
+    private String lastCharEvaluator(String word){
         if(lastCharChecker(word)){
             char[] wordArray = new char[word.length()-1];
             for(int i = 0; i < word.length()-1; i++){
@@ -208,17 +214,17 @@ public class UDPServer {
 
     }
 
-    public boolean lastCharChecker(String word){
+    private boolean lastCharChecker(String word){
         char lastChar =  word.charAt(word.length()-1);
         return lastChar == ',' || lastChar == '.' || lastChar == '!' || lastChar == '?' || lastChar == ' ';
     }
 
-    public String[] stringAnonymizer(String phrase, String wordToBeAnonimized){
+    private String[] stringAnonymizer(String phrase, String wordToBeAnonymized){
         String[] anonymized = new String[2];
         int counter = 0;
         String[] phraseArray = phrase.split(" ");
         for(int i = 0; i < phraseArray.length; i++){
-            if(lastCharEvaluator(phraseArray[i]).equalsIgnoreCase(wordToBeAnonimized)){
+            if(lastCharEvaluator(phraseArray[i]).equalsIgnoreCase(wordToBeAnonymized)){
                 phraseArray[i] = wordAnonimyzer(phraseArray[i]);
                 counter++;
             }
@@ -230,7 +236,7 @@ public class UDPServer {
 
     }
 
-    public String wordAnonimyzer(String word){
+    private String wordAnonimyzer(String word){
         char[] wordArray = new char[word.length()];
         for(int i = 0; i < word.length(); i++){
             wordArray[i] = word.charAt(i);

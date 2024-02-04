@@ -35,7 +35,7 @@ public class UDPClient {
         int numberOfFragments = (int) Math.ceil((double) messageLength / bufferLength);
         String[] fragmentedMessage = divideMessage(message,numberOfFragments);
 
-        if(sendReliablePacket("Length:" + numberOfFragments,address,port) == -1){
+        if(sendReliablePacket("Packets: " + numberOfFragments,address,port) == -1){
             return -1;
         }
 
@@ -65,9 +65,9 @@ public class UDPClient {
     /**
      * Repeatedly reads a line from terminal, sends it to a server living at hostname:port, and waits for a reply
      * Use CTRL + D to exit
-     *
+     *  @param message Message to be sent
      *  @param address IP address of the UDP server
-     *  @param port Port binded to the UDP server living at hostname
+     *  @param port UDP port where server is running
      */
     private int sendReliablePacket(String message, InetAddress address, int port) {
         int counter = 0;
@@ -76,7 +76,7 @@ public class UDPClient {
 
             while (!received.equals("ACK") && counter < 3) {
                 counter++;
-                sendPacket(address,port,message);
+                sendPacket(message,address,port);
                 received = receivePacket();
             }
 
@@ -94,11 +94,16 @@ public class UDPClient {
         return 0;
     }
 
+    private void sendPacket(String message, InetAddress address, int port) throws IOException {
+        sendData = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(sendData, sendData.length, address, port);
+        udpSocket.send(packet);
+    }
+
     public String receiveMessage(String hostname, int port){
         String message = receiveReliablePacket(hostname, port);
 
-        if (!message.contains("Length:")){
-
+        if (!message.contains("Packets: ")){
             return null;
         }
         // Split the string by colon
@@ -124,7 +129,7 @@ public class UDPClient {
         try{
             InetAddress address = InetAddress.getByName(hostname);
             received = receivePacket();
-            sendPacket(address,port,"ACK");
+            sendPacket("ACK",address,port);
 
         }catch(SocketTimeoutException e){
             System.err.println("Timeout reached: " + e.getMessage());
@@ -134,11 +139,7 @@ public class UDPClient {
         return received;
     }
 
-    private void sendPacket(InetAddress address, int port, String message) throws IOException {
-        sendData = message.getBytes();
-        DatagramPacket packet = new DatagramPacket(sendData, sendData.length, address, port);
-        udpSocket.send(packet);
-    }
+
 
     private String receivePacket() throws IOException {
         DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
@@ -150,7 +151,7 @@ public class UDPClient {
     /**
      * Closes the DatagramSocket
      */
-    public void close() {
+    private void close() {
         udpSocket.close();
     }
 
@@ -197,12 +198,14 @@ public class UDPClient {
             client.close();
             System.exit(1);
         }
+
         String received = client.receiveMessage(hostname,port);
         if(received == null){
             client.close();
             System.exit(1);
         }
         System.out.println(received);
+
         received = client.receiveMessage(hostname,port);
         if(received == null){
             client.close();
